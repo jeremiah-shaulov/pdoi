@@ -160,14 +160,30 @@ class Pdoi extends Pdo
 	}
 
 	public function getAttribute($attribute)
-	{	switch ($attribute)
-		{	case PDO::ATTR_SERVER_VERSION:
-				return $this->mysqli->server_info;
-			case PDO::ATTR_AUTOCOMMIT:
-				return $this->options[PDO::ATTR_AUTOCOMMIT] ?? 1;
-			// TODO: implement
+	{	if (!$this->mysqli)
+		{	return parent::getAttribute($attribute);
 		}
-		return false;
+		else
+		{	switch ($attribute)
+			{	case PDO::ATTR_SERVER_VERSION:
+					return $this->mysqli->server_info;
+				case PDO::ATTR_AUTOCOMMIT:
+					return $this->options[PDO::ATTR_AUTOCOMMIT] ?? null;
+				// TODO: implement
+			}
+			return $this->options[PDO::ATTR_AUTOCOMMIT] ?? false;
+		}
+	}
+
+	public function setAttribute($attribute, $value): bool
+	{	if (!$this->mysqli)
+		{	return parent::setAttribute($attribute, $value);
+		}
+		else
+		{	$this->options[$attribute] = $value;
+			// TODO: implement
+			return false;
+		}
 	}
 
 	public static function getAvailableDrivers(): array
@@ -236,11 +252,6 @@ class Pdoi extends Pdo
 			$this->in_transaction = false;
 			return true;
 		}
-	}
-
-	public function setAttribute($attribute, $value): bool
-	{	// TODO: ...
-		return false;
 	}
 }
 
@@ -466,9 +477,6 @@ class PdoiStatement implements Iterator
 					if ($placeholders === null)
 					{	return $this->failure('Cannot use "?" placeholders with named parameters');
 					}
-				}
-				if (count($this->placeholders) != count($this->bound))
-				{	return $this->failure('Invalid parameter number');
 				}
 				$bound = [''];
 				foreach ($this->placeholders as $parameter)
