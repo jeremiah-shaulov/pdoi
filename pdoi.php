@@ -20,7 +20,7 @@ class Pdoi extends Pdo
 					$port = null;
 					$dbname = null;
 					$unix_socket = null;
-					$charset = null; // not used
+					$charset = null;
 					foreach (explode(';', substr($dsn, $pos+1)) as $kv)
 					{	$pos = strpos($kv, '=');
 						$k = strtolower(trim(substr($kv, 0, $pos)));

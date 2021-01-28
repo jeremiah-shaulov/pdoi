@@ -27,14 +27,21 @@ Current persistent connections implementation in `mysqli` and `PDO`, as of Janua
 
 Each connection should be reset immediately at script end. This library calls `mysqli_change_user()` in destructor of `Pdoi` object. What i love in PHP is reference-counting objects, and that destructors are called immediately when the object is not in use.
 
+## Installation
+
+Create a directory for your application, cd to it, and issue:
+
+```
+composer require jeremiah-shaulov/pdoi
+```
+
 ## Example
 
 ```php
 <?php
 
+require_once 'vendor/autoload.php';
 use Pdoi\Pdoi as Pdo;
-
-require_once 'pdoi.php';
 
 $db = new Pdo
 (	'mysql:host=localhost',

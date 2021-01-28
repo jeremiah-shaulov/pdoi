@@ -1,0 +1,18 @@
+{	"name": "jeremiah-shaulov/pdoi",
+	"description": "Improved PDO for MySQL connections pooling",
+	"keywords": ["db-pool"],
+	"homepage": "https://github.com/jeremiah-shaulov/pdoi",
+	"license": "MIT",
+	"authors":
+	[	{	"name": "Jeremiah Shaulov",
+			"email": "jeremiah-shaulov@gmail.com",
+			"role": "Developer"
+		}
+	],
+	"require":
+	{	"php": ">=7.4"
+	},
+	"autoload":
+	{	"files": ["pdoi.php"]
+	}
+}
