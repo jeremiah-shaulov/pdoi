@@ -34,7 +34,7 @@ Each connection should be reset immediately at script end. This library calls `m
 
 use Pdoi\Pdoi as Pdo;
 
-require_once __DIR__.'/../Packages/Pdoi/index.php';
+require_once 'pdoi.php';
 
 $db = new Pdo
 (	'mysql:host=localhost',
