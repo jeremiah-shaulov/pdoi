@@ -49,3 +49,6 @@ $db = new Pdo
 
 var_dump($db->query("SELECT Connection_id()")->fetchColumn());
 ```
+
+Running this example from CLI will show different `Connection_id()` each time, because there will be only 1 connection in process lifecycle.
+But running from PHP-FPM will show that the same connection numbers appear many times.
