@@ -2,7 +2,11 @@
 
 namespace Pdoi;
 
-use Exception, Pdo, mysqli, mysqli_stmt, mysqli_result, ReflectionClass, Iterator;
+use Pdo, PdoException, mysqli, mysqli_stmt, mysqli_result, ReflectionClass, Iterator;
+
+class PdoiException extends PdoException
+{
+}
 
 class Pdoi extends Pdo
 {	private ?mysqli $mysqli = null;
@@ -41,62 +45,62 @@ class Pdoi extends Pdo
 						{	$unix_socket = $v;
 						}
 						else if ($k == 'charset')
-						{	$this->mysqli->options(MYSQLI_SET_CHARSET_NAME, $v);
+						{	$this->mysqli->options(\MYSQLI_SET_CHARSET_NAME, $v);
 						}
 						else
-						{	throw new Exception("Unknown DSN option: $k");
+						{	throw new PdoiException("Unknown DSN option: $k");
 						}
 					}
 					// check $host
 					if ($unix_socket)
 					{	if ($host)
-						{	throw new Exception("Cannot understand DSN: both host and socket specified");
+						{	throw new PdoiException("Cannot understand DSN: both host and socket specified");
 						}
 						$host = 'localhost';
 					}
 					else if (!$host)
-					{	throw new Exception("Cannot understand DSN: no host or socket");
+					{	throw new PdoiException("Cannot understand DSN: no host or socket");
 					}
 					if (($options[PDO::ATTR_PERSISTENT] ?? false) and substr($host, 0, 2)!='p:')
 					{	$host = "p:$host";
 					}
 					// $options to be set before connection
 					switch ($options[PDO::ATTR_ERRMODE] ?? PDO::ERRMODE_SILENT)
-					{	case PDO::ERRMODE_WARNING: mysqli_report(MYSQLI_REPORT_ERROR); break;
-						case PDO::ERRMODE_EXCEPTION: mysqli_report(MYSQLI_REPORT_ERROR | MYSQLI_REPORT_STRICT); break;
+					{	case PDO::ERRMODE_WARNING: mysqli_report(\MYSQLI_REPORT_ERROR); break;
+						case PDO::ERRMODE_EXCEPTION: mysqli_report(\MYSQLI_REPORT_ERROR | \MYSQLI_REPORT_STRICT); break;
 					}
 					if (($v = $options[PDO::MYSQL_ATTR_LOCAL_INFILE] ?? null) !== null)
-					{	$this->mysqli->options(MYSQLI_OPT_LOCAL_INFILE, $v);
+					{	$this->mysqli->options(\MYSQLI_OPT_LOCAL_INFILE, $v);
 					}
 					if (($v = $options[PDO::MYSQL_ATTR_INIT_COMMAND] ?? null))
-					{	$this->mysqli->options(MYSQLI_INIT_COMMAND, $v);
+					{	$this->mysqli->options(\MYSQLI_INIT_COMMAND, $v);
 					}
 					if (defined('PDO::MYSQL_ATTR_READ_DEFAULT_FILE') and ($v = $options[PDO::MYSQL_ATTR_READ_DEFAULT_FILE] ?? null) !== null)
-					{	$this->mysqli->options(MYSQLI_READ_DEFAULT_FILE, $v);
+					{	$this->mysqli->options(\MYSQLI_READ_DEFAULT_FILE, $v);
 					}
 					if (defined('PDO::MYSQL_ATTR_READ_DEFAULT_GROUP') and ($v = $options[PDO::MYSQL_ATTR_READ_DEFAULT_GROUP] ?? null) !== null)
-					{	$this->mysqli->options(MYSQLI_READ_DEFAULT_GROUP, $v);
+					{	$this->mysqli->options(\MYSQLI_READ_DEFAULT_GROUP, $v);
 					}
 					if (($v = $options[PDO::MYSQL_ATTR_SSL_VERIFY_SERVER_CERT] ?? null) !== null)
-					{	$this->mysqli->options(MYSQLI_OPT_SSL_VERIFY_SERVER_CERT, $v);
+					{	$this->mysqli->options(\MYSQLI_OPT_SSL_VERIFY_SERVER_CERT, $v);
 					}
 					// connection flags
 					$flags = 0;
 					if ($options[PDO::MYSQL_ATTR_FOUND_ROWS] ?? false)
-					{	$flags |= MYSQLI_CLIENT_FOUND_ROWS;
+					{	$flags |= \MYSQLI_CLIENT_FOUND_ROWS;
 					}
 					if ($options[PDO::MYSQL_ATTR_IGNORE_SPACE] ?? false)
-					{	$flags |= MYSQLI_CLIENT_IGNORE_SPACE;
+					{	$flags |= \MYSQLI_CLIENT_IGNORE_SPACE;
 					}
 					if ($options[PDO::MYSQL_ATTR_COMPRESS] ?? false)
-					{	$flags |= MYSQLI_CLIENT_COMPRESS;
+					{	$flags |= \MYSQLI_CLIENT_COMPRESS;
 					}
 					// TODO: PDO::MYSQL_ATTR_SSL_CA, PDO::MYSQL_ATTR_SSL_CAPATH, PDO::MYSQL_ATTR_SSL_CERT, PDO::MYSQL_ATTR_SSL_CIPHER, PDO::MYSQL_ATTR_SSL_KEY
 					// TODO: PDO::MYSQL_ATTR_MULTI_STATEMENTS, PDO::ATTR_CASE, PDO::ATTR_ORACLE_NULLS, PDO::ATTR_STRINGIFY_FETCHES, PDO::ATTR_STATEMENT_CLASS, PDO::ATTR_TIMEOUT
 					// connect
 					$this->mysqli->real_connect($host, $username, $password, $dbname, $port, $unix_socket, $flags);
 					if ($this->mysqli->connect_error)
-					{	throw new Exception($this->mysqli->connect_error);
+					{	throw new PdoiException($this->mysqli->connect_error);
 					}
 					// store $username, $username and $dbname, to be used in __destruct()
 					$this->username = $username;
@@ -125,7 +129,7 @@ class Pdoi extends Pdo
 
 	private function failure($default_message)
 	{	if (($this->options[PDO::ATTR_ERRMODE] ?? PDO::ERRMODE_SILENT) != PDO::ERRMODE_SILENT)
-		{	throw new Exception($this->mysqli->error ? $this->mysqli->error : $default_message);
+		{	throw new PdoiException($this->mysqli->error ? $this->mysqli->error : $default_message);
 		}
 		return false;
 	}
@@ -179,7 +183,7 @@ class Pdoi extends Pdo
 		{	return parent::exec($statement);
 		}
 		else
-		{	$result = $this->mysqli->query($statement, MYSQLI_USE_RESULT);
+		{	$result = $this->mysqli->query($statement, \MYSQLI_USE_RESULT);
 			if ($result === false)
 			{	return $this->failure("Query failed");
 			}
@@ -256,7 +260,7 @@ class Pdoi extends Pdo
 		}
 		else
 		{	$buffered = $this->options[PDO::MYSQL_ATTR_USE_BUFFERED_QUERY] ?? true;
-			$result = $this->mysqli->query($statement, $buffered ? MYSQLI_STORE_RESULT : MYSQLI_USE_RESULT);
+			$result = $this->mysqli->query($statement, $buffered ? \MYSQLI_STORE_RESULT : \MYSQLI_USE_RESULT);
 			if ($result === false)
 			{	return $this->failure("Query failed");
 			}
@@ -377,7 +381,7 @@ class PdoiStatement implements Iterator
 		}
 		$this->last_error = $error;
 		if (($this->options[PDO::ATTR_ERRMODE] ?? PDO::ERRMODE_SILENT) != PDO::ERRMODE_SILENT)
-		{	throw new Exception($error);
+		{	throw new PdoiException($error);
 		}
 		return false;
 	}
@@ -646,13 +650,13 @@ class PdoiStatement implements Iterator
 		{	$row = $this->result->fetch_array();
 		}
 		else if ($fetch_style == PDO::FETCH_BOUND)
-		{	throw new Exception("PDO::FETCH_BOUND is not implemented in Pdoi"); // TODO: implement
+		{	throw new PdoiException("PDO::FETCH_BOUND is not implemented in Pdoi"); // TODO: implement
 		}
 		else if ($fetch_style == PDO::FETCH_INTO)
-		{	throw new Exception("PDO::FETCH_INTO is not implemented in Pdoi"); // TODO: implement
+		{	throw new PdoiException("PDO::FETCH_INTO is not implemented in Pdoi"); // TODO: implement
 		}
 		else if ($fetch_style == PDO::FETCH_LAZY)
-		{	throw new Exception("PDO::FETCH_LAZY is not implemented in Pdoi"); // TODO: implement
+		{	throw new PdoiException("PDO::FETCH_LAZY is not implemented in Pdoi"); // TODO: implement
 		}
 		else if ($fetch_style == PDO::FETCH_NAMED)
 		{	$row = $this->result->fetch_row();
@@ -673,7 +677,7 @@ class PdoiStatement implements Iterator
 			}
 		}
 		else
-		{	throw new Exception("Such fetch type is not implemented in Pdoi");
+		{	throw new PdoiException("Such fetch type is not implemented in Pdoi");
 		}
 		if (!$row) // if false or null
 		{	if ($row === false)
