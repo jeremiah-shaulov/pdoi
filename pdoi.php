@@ -425,7 +425,7 @@ class PdoiStatement implements Iterator
 	}
 
 	public function bindParam($parameter, &$variable, $data_type=PDO::PARAM_STR, $length=null, $driver_options=null): bool
-	{	// TODO: $length, $driver_options
+	{	// TODO: $data_type, $length, $driver_options
 		if (!$this->is_prepared_stmt)
 		{	return $this->failure("Not a prepared statement");
 		}
@@ -441,6 +441,9 @@ class PdoiStatement implements Iterator
 		}
 		else if (!$this->bound)
 		{	$this->bound[0] = '';
+			if ($parameter < 1)
+			{	return $this->failure("Parameter number must be 1-based");
+			}
 		}
 		$this->bound[$parameter] = &$variable;
 		return true;
@@ -492,18 +495,9 @@ class PdoiStatement implements Iterator
 				$this->bindParam($parameter, $input_parameters[$k]);
 			}
 		}
+		$lobs = null;
 		if ($this->bound)
-		{	$types = '';
-			if (!$this->bound_as_names)
-			{	for ($i=1, $i_end=count($this->bound)-1; $i<=$i_end; $i++)
-				{	if (!array_key_exists($i, $this->bound))
-					{	return $this->failure("Parameter #$i not bound");
-					}
-					$types .= is_int($this->bound[$i]) ? 'i' : (is_float($this->bound[$i]) ? 'd' : 's');
-				}
-				$this->bound[0] = $types;
-			}
-			else
+		{	if ($this->bound_as_names)
 			{	if ($this->placeholders === null)
 				{	$placeholders = self::find_placeholders_in_sql($this->query_string); // TODO: ansi_quotes, no_backslash_escapes
 					$this->placeholders = $placeholders ?? [];
@@ -516,12 +510,32 @@ class PdoiStatement implements Iterator
 				{	if (!array_key_exists($parameter, $this->bound))
 					{	return $this->failure("Parameter \"$parameter\" not bound");
 					}
-					$types .= is_int($this->bound[$parameter]) ? 'i' : (is_float($this->bound[$parameter]) ? 'd' : 's');
 					$bound[] = &$this->bound[$parameter];
 				}
-				$bound[0] = $types;
 				$this->bound = $bound;
 			}
+			$null = null;
+			$types = '';
+			for ($i=1, $i_end=count($this->bound)-1; $i<=$i_end; $i++)
+			{	if (!array_key_exists($i, $this->bound))
+				{	return $this->failure("Parameter #$i not bound");
+				}
+				if (is_int($this->bound[$i]))
+				{	$types .= 'i';
+				}
+				else if (is_float($this->bound[$i]))
+				{	$types .= 'd';
+				}
+				else if (is_resource($this->bound[$i]))
+				{	$types .= 'b';
+					$lobs[$i-1] = $this->bound[$i];
+					$this->bound[$i] = &$null;
+				}
+				else
+				{	$types .= 's';
+				}
+			}
+			$this->bound[0] = $types;
 		}
 		if ($this->prepared_stmt === null)
 		{	$prepared_stmt = $this->mysqli->prepare($this->query_string);
@@ -533,6 +547,13 @@ class PdoiStatement implements Iterator
 		if ($this->bound)
 		{	if (call_user_func_array([$this->prepared_stmt, 'bind_param'], $this->bound) === false)
 			{	return $this->failure("Failed to bind parameters", $this->prepared_stmt->error);
+			}
+			if ($lobs)
+			{	foreach ($lobs as $i => $fh)
+				{	while (!feof($fh))
+					{	$this->prepared_stmt->send_long_data($i, fread($fh, 16*1024));
+					}
+				}
 			}
 		}
 		$result = (bool)$this->prepared_stmt->execute();

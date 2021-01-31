@@ -11,14 +11,17 @@ use Pdoi\Pdoi;
 */
 
 class PdoTest extends TestCase
-{	protected function connect($dsn, $options=null)
-	{	$class = ($this instanceof PdoiTest) ? Pdoi::class : Pdo::class;
+{	protected function connect($dsn=null, $options=null): Pdo
+	{	if ($dsn === null)
+		{	$dsn = "mysql:host=localhost;dbname=tests";
+		}
+		$class = ($this instanceof PdoiTest) ? Pdoi::class : Pdo::class;
 		return new $class($dsn, "tests", "", $options);
 	}
 
 	public function test_connection()
 	{	// 1. Connect through TCP
-		$db = $this->connect("mysql:host=localhost;dbname=tests");
+		$db = $this->connect();
 		$this->assertIsObject($db);
 
 		// 2. Simple query
@@ -36,20 +39,41 @@ class PdoTest extends TestCase
 	}
 
 	public function test_error_mode_silent()
-	{	$db = $this->connect("mysql:host=localhost;dbname=tests", [PDO::ATTR_ERRMODE => PDO::ERRMODE_SILENT]);
+	{	$db = $this->connect(null, [PDO::ATTR_ERRMODE => PDO::ERRMODE_SILENT]);
 		$db->query("HELLO");
 		$this->assertTrue(true);
 	}
 
 	public function test_error_mode_warning()
-	{	$db = $this->connect("mysql:host=localhost;dbname=tests", [PDO::ATTR_ERRMODE => PDO::ERRMODE_WARNING]);
+	{	$db = $this->connect(null, [PDO::ATTR_ERRMODE => PDO::ERRMODE_WARNING]);
 		$this->expectWarning();
 		$db->query("HELLO");
 	}
 
 	public function test_error_mode_exception()
-	{	$db = $this->connect("mysql:host=localhost;dbname=tests", [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION]);
+	{	$db = $this->connect(null, [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION]);
 		$this->expectException('Throwable');
 		$db->query("HELLO");
+	}
+
+	public function test_lob()
+	{	// data
+		$data = 'Hello all';
+		// file
+		$fh = tmpfile();
+		fwrite($fh, $data);
+		fseek($fh, 0);
+		// connect
+		$db = $this->connect();
+		// create table
+		$db->exec("CREATE TEMPORARY TABLE t_messages (id int PRIMARY KEY AUTO_INCREMENT, data text NOT NULL)");
+		// insert
+		$stmt = $db->prepare("INSERT INTO t_messages SET data=?");
+		$stmt->bindParam(1, $fh, PDO::PARAM_LOB);
+		$stmt->execute();
+		// select back
+		$data_back = $db->query("SELECT data FROM t_messages")->fetchColumn();
+		// compare
+		$this->assertEquals($data_back, $data);
 	}
 }
