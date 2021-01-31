@@ -488,7 +488,8 @@ class PdoiStatement implements Iterator
 		}
 		if (is_array($input_parameters))
 		{	foreach (array_keys($input_parameters) as $k)
-			{	$this->bindParam($k, $input_parameters[$k]);
+			{	$parameter = !is_numeric($k) ? $k : $k+1; // bindParam() wants 1-based
+				$this->bindParam($parameter, $input_parameters[$k]);
 			}
 		}
 		if ($this->bound)
