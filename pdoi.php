@@ -12,7 +12,7 @@ class Pdoi extends Pdo
 {	private ?mysqli $mysqli = null;
 	private ?array $options = null;
 	private bool $in_transaction = false;
-	private $username, $password, $dbname;
+	private ?string $username=null, $password=null, $dbname=null;
 
 	public function __construct($dsn, $username=null, $password=null, $options=null)
 	{	// use mysqli?
@@ -61,8 +61,10 @@ class Pdoi extends Pdo
 					else if (!$host)
 					{	throw new PdoiException("Cannot understand DSN: no host or socket");
 					}
-					if (($options[PDO::ATTR_PERSISTENT] ?? false) and substr($host, 0, 2)!='p:')
+					$is_persistent = substr($host, 0, 2) == 'p:';
+					if (!$is_persistent and ($options[PDO::ATTR_PERSISTENT] ?? false))
 					{	$host = "p:$host";
+						$is_persistent = true;
 					}
 					// $options to be set before connection
 					switch ($options[PDO::ATTR_ERRMODE] ?? PDO::ERRMODE_SILENT)
@@ -103,9 +105,11 @@ class Pdoi extends Pdo
 					{	throw new PdoiException($this->mysqli->connect_error);
 					}
 					// store $username, $username and $dbname, to be used in __destruct()
-					$this->username = $username;
-					$this->password = $password;
-					$this->dbname = $dbname;
+					if ($is_persistent)
+					{	$this->username = $username;
+						$this->password = $password;
+						$this->dbname = $dbname;
+					}
 					// $options to be set after connection
 					if (($v = $options[PDO::ATTR_AUTOCOMMIT] ?? null) !== null)
 					{	$this->mysqli->autocommit($v);
@@ -122,7 +126,7 @@ class Pdoi extends Pdo
 	/**	Important to release locks at the end of usage, and not in the beginning of next session, so other parallel connections will not suffer.
 	 **/
 	function __destruct()
-	{	if ($this->mysqli)
+	{	if ($this->mysqli and $this->username!==null)
 		{	$this->mysqli->change_user($this->username, $this->password, $this->dbname);
 		}
 	}
