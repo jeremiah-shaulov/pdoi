@@ -3,6 +3,7 @@
 namespace Pdoi;
 
 use Pdo, PdoException, mysqli, mysqli_stmt, mysqli_result, ReflectionClass, Iterator;
+use Throwable;
 
 class PdoiException extends PdoException
 {
@@ -98,7 +99,7 @@ class Pdoi extends Pdo
 					{	$flags |= \MYSQLI_CLIENT_COMPRESS;
 					}
 					// TODO: PDO::MYSQL_ATTR_SSL_CA, PDO::MYSQL_ATTR_SSL_CAPATH, PDO::MYSQL_ATTR_SSL_CERT, PDO::MYSQL_ATTR_SSL_CIPHER, PDO::MYSQL_ATTR_SSL_KEY
-					// TODO: PDO::MYSQL_ATTR_MULTI_STATEMENTS, PDO::ATTR_CASE, PDO::ATTR_ORACLE_NULLS, PDO::ATTR_STRINGIFY_FETCHES, PDO::ATTR_STATEMENT_CLASS, PDO::ATTR_TIMEOUT
+					// TODO: PDO::ATTR_CASE, PDO::ATTR_ORACLE_NULLS, PDO::ATTR_STRINGIFY_FETCHES, PDO::ATTR_STATEMENT_CLASS, PDO::ATTR_TIMEOUT
 					// connect
 					$this->mysqli->real_connect($host, $username, $password, $dbname, $port, $unix_socket, $flags);
 					if ($this->mysqli->connect_error)
@@ -186,7 +187,7 @@ class Pdoi extends Pdo
 	{	if (!$this->mysqli)
 		{	return parent::exec($statement);
 		}
-		else
+		else if (!($this->options[PDO::MYSQL_ATTR_MULTI_STATEMENTS] ?? true))
 		{	$result = $this->mysqli->query($statement, \MYSQLI_USE_RESULT);
 			if ($result === false)
 			{	return $this->failure("Query failed");
@@ -196,6 +197,20 @@ class Pdoi extends Pdo
 			}
 			$result->free();
 			return 0;
+		}
+		else
+		{	if ($this->mysqli->multi_query($statement) === false)
+			{	return $this->failure("Query failed");
+			}
+			$affected_rows = max(0, $this->mysqli->affected_rows);
+			do
+			{	$result = $this->mysqli->use_result();
+				if (!is_bool($result))
+				{	$result->free();
+				}
+			}
+			while ($this->mysqli->next_result());
+			return $affected_rows;
 		}
 	}
 
@@ -264,9 +279,25 @@ class Pdoi extends Pdo
 		}
 		else
 		{	$buffered = $this->options[PDO::MYSQL_ATTR_USE_BUFFERED_QUERY] ?? true;
-			$result = $this->mysqli->query($statement, $buffered ? \MYSQLI_STORE_RESULT : \MYSQLI_USE_RESULT);
-			if ($result === false)
-			{	return $this->failure("Query failed");
+			if (!($this->options[PDO::MYSQL_ATTR_MULTI_STATEMENTS] ?? true))
+			{	// single statement
+				$result = $this->mysqli->query($statement, $buffered ? \MYSQLI_STORE_RESULT : \MYSQLI_USE_RESULT);
+				if ($result === false)
+				{	return $this->failure("Query failed");
+				}
+			}
+			else
+			{	// multi statement
+				if ($this->mysqli->multi_query($statement) === false)
+				{	return $this->failure("Query failed");
+				}
+				$result = $buffered ? $this->mysqli->store_result() : $this->mysqli->use_result();
+				if ($result === false)
+				{	if ($this->mysqli->field_count > 0)
+					{	return $this->failure("Failed to receive resultset");
+					}
+					$result = true;
+				}
 			}
 			return new PdoiStatement($this->mysqli, $this->options, false, $result, $statement, $fetch_style, $fetch_arg_0, $fetch_arg_1);
 		}
@@ -377,6 +408,23 @@ class PdoiStatement implements Iterator
 		$this->fetch_style = $fetch_style;
 		$this->fetch_arg_0 = $fetch_arg_0;
 		$this->fetch_arg_1 = $fetch_arg_1;
+	}
+
+	function __destruct()
+	{	if ($this->result !== true)
+		{	try
+			{	$this->result->free();
+			}
+			catch (Throwable $e)
+			{
+			}
+		}
+		while ($this->mysqli->next_result());
+		{	$result = $this->mysqli->use_result();
+			if (!is_bool($result))
+			{	$result->free();
+			}
+		}
 	}
 
 	private function failure($default_message, $error=null)
@@ -818,8 +866,22 @@ class PdoiStatement implements Iterator
 	}
 
 	public function nextRowset(): bool
-	{	// TODO: implement
-		return false;
+	{	if ($this->result !== true)
+		{	$this->result->free();
+		}
+		if (!$this->mysqli->next_result())
+		{	return false;
+		}
+		$buffered = $this->options[PDO::MYSQL_ATTR_USE_BUFFERED_QUERY] ?? true;
+		$result = $buffered ? $this->mysqli->store_result() : $this->mysqli->use_result();
+		if ($result === false)
+		{	if ($this->mysqli->field_count > 0)
+			{	return $this->failure("Failed to receive resultset");
+			}
+			$result = true;
+		}
+		$this->result = $result;
+		return true;
 	}
 
 	public function rowCount()
