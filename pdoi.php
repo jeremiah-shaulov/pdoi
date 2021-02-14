@@ -888,7 +888,9 @@ class PdoiStatement implements Iterator
 	{	if ($this->result !== true)
 		{	return (int)$this->result->num_rows;
 		}
-		return 0;
+		else
+		{	return $this->mysqli->affected_rows;
+		}
 	}
 
 	public function setAttribute($attribute, $value): bool

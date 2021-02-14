@@ -377,4 +377,12 @@ SQL;
 		$this->expectException('Throwable');
 		$db->exec("INSERT INTO t (id) VALUES (1), (2); INSERT INTO t (id) VALUES (3), (4), (5)");
 	}
+
+	public function test_row_count()
+	{	$db = $this->connect();
+		$db->exec("CREATE TEMPORARY TABLE t_messages (id int PRIMARY KEY, data text NOT NULL)");
+		$this->assertEquals(3, $db->exec("INSERT INTO t_messages (id, data) VALUES (1, 'One'), (2, 'Two'), (3, 'Three')"));
+		$this->assertEquals(2, $db->query("UPDATE t_messages SET data=Concat(data, ' 2.0') WHERE id<=2")->rowCount());
+		$this->assertEquals(2, $db->query("SELECT id FROM t_messages WHERE id<=2")->rowCount());
+	}
 }
